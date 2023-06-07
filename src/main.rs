@@ -10,7 +10,7 @@ use serenity::framework::standard::macros::{command, group};
 use serenity::framework::standard::{StandardFramework, CommandResult};
 
 mod commands;
-use commands::{fun::*};
+use commands::{fun::*, valorant::*};
 struct Handler;
 
 #[async_trait]
@@ -26,13 +26,18 @@ struct General;
 #[commands(cat, shiba)]
 struct Fun;
 
+#[group]
+#[prefixes("valorant")]
+#[commands(getuser)]
+struct Valorant;
 
 #[tokio::main]
 async fn main() {
     let framework = StandardFramework::new()
         .configure(|c| c.prefix("=="))
         .group(&GENERAL_GROUP)
-        .group(&FUN_GROUP);
+        .group(&FUN_GROUP)
+        .group(&VALORANT_GROUP);
     
     let token = env::var("token").expect("token");
     let intents = GatewayIntents::non_privileged() | GatewayIntents::MESSAGE_CONTENT;
