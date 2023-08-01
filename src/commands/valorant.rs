@@ -1,61 +1,53 @@
-use serenity::prelude::*;
+use anyhow::Ok;
 use serenity::model::channel::Message;
+use serenity::prelude::*;
+use reqwest::{Client, StatusCode};
+use serde::{Deserialize, Serialize};
+use serde_json;
 
-use serenity::framework::standard::macros::{command};
-use serenity::framework::standard::{CommandResult};
-
-use reqwest::{self, Url};
-
-#[command]
-#[description = "Get user by usrname and region"]
-async fn getuser(ctx: &Context, msg: &Message) -> CommandResult {
-
-    // Get params from message
-    let params = msg.content.split(" ").collect::<Vec<&str>>();
-
-    // Check if params are valid
-    // 0: prefix
-    // 1: command
-    // 2: username
-    // 3: region
-    if params.len() < 3 {
-        msg.reply(ctx, "Invalid params").await?;
-        return Ok(());
-    }
-
-    // Get username
-    let username = params[2];
-
-    // Get region
-    let region = params[3];
-
-    // parse region to region code
-    let region_code = match region {
-        "na" => "na1",
-        "eu" => "euw1",
-        "kr" => "kr",
-        "jp" => "jp1",
-        "br" => "br1",
-        "oc" => "oc1",
-        "eune" => "eun1",
-        "tr" => "tr1",
-        "ru" => "ru",
-        "la" => "la1",
-        "la2" => "la2",
-
-        _ => {
-            msg.reply(ctx, "Invalid region").await?;
-            return Ok(());
-        }
-    };
-
-    // create string for url
-    let url = format!("https://{}.api.riotgames.com/lol/summoner/v4/summoners/by-name/{}", region_code, username);
-
-    let url = Url::parse(&url).unwrap();
-    let res = reqwest::get(url).await?;
-    println!("{:?}", res.status());
-
-    Ok(())
+#[allow(non_snake_case)]
+#[derive(Serialize, Deserialize, Debug)]
+struct User {
+    id: String,
+    accountId: String,
+    puuid: String,
+    name: String,
+    profileIconId: i32,
+    revisionDate: i64,
+    summonerLevel: i32
 }
 
+
+pub async fn get_user_by_name(name: String, region: String) -> serenity::builder::CreateEmbed{
+    // control variables
+    let string = format!("https://{}.api.riotgames.com/lol/summoner/v4/summoners/by-name/{}", &region, &name);
+
+    // get the user from riot api
+    let client = Client::new();
+    let res = client.get(string)
+        .header("X-Riot-Token", "TOKEN")
+        .send()
+        .await
+        .unwrap();
+
+    let status = &res.status();
+    assert_eq!(status, &StatusCode::OK);
+
+    let body = res.text().await.unwrap();
+    let user = serde_json::from_str::<User>(&body).unwrap();
+
+    // create the embed
+    let mut embed = serenity::builder::CreateEmbed::default();
+    let embed = embed.title(format!("{}'s Profile", &user.name))
+        .description(format!("Level: {}", &user.summonerLevel))
+        .field("Region", &region, true)
+        .field("ID", &user.id, true)
+        .field("Account ID", &user.accountId, true)
+        .field("PUUID", &user.puuid, true)
+        .field("Profile Icon ID", &user.profileIconId, true)
+        .field("Revision Date", &user.revisionDate, true);
+
+    // Return the embed
+    return embed.clone()
+
+}
