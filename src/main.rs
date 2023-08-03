@@ -7,11 +7,25 @@ use serenity::model::gateway::Ready;
 use serenity::prelude::*;
 use shuttle_secrets::SecretStore;
 use tracing::{error, info};
+use std::any::{TypeId, Any};
 
 mod commands;
-use commands::{valorant::*};
+use commands::valorant::*;
 
 struct Bot; 
+
+#[derive(Debug)]
+enum StringOrEmbed<'a> {
+    String(String),
+    Embed(serenity::builder::CreateEmbed),
+    Str(&'a str)
+}
+
+
+fn is_embed<T: ?Sized + Any>(_s: &T) -> bool {
+    TypeId::of::<serenity::builder::CreateEmbed>() == TypeId::of::<T>()
+}
+
 
 #[async_trait]
 impl EventHandler for Bot {
@@ -23,6 +37,7 @@ impl EventHandler for Bot {
 
         let commands = GuildId::set_application_commands(&guild_id, &ctx.http, |commands| {
             commands.create_application_command(|command| { command.name("hello").description("Say hello") });
+            commands.create_application_command(|command| { command.name("profile").description("Get your Valorant profile") });
             commands.create_application_command(|command| { 
                 command
                     .name("getuserbyname")
@@ -49,6 +64,7 @@ impl EventHandler for Bot {
                             .required(true)
                     })
             })
+            
         }).await.unwrap();
 
         info!("{:?}", commands)
@@ -56,20 +72,29 @@ impl EventHandler for Bot {
 
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
         if let Interaction::ApplicationCommand(command) = interaction {
-            let response_content = match command.data.name.as_str() {
-                "hello" => "hello".to_owned(),
-                "getuserbyname" => {
-                    // Get the username and region from the command
-                    let username = command.data.options[0].value.as_ref().unwrap().as_str().unwrap().to_owned();
-                    let region = command.data.options[1].value.as_ref().unwrap().as_str().unwrap().to_owned();
-
-                    // Get the user from the Riot API
-                    let user = get_user_by_name(username, region).await;
-                    user.to_owned();
+            let command_name = StringOrEmbed::String(command.data.name.clone());
+            let response_content = match command_name {
+                StringOrEmbed::Str("profile") => {
+                    let user_id = command.user.id;
+                    let profile = profile(user_id).await;
+                    profile.to_owned();
                 }
-
-                command => unreachable!("Unexpected command: {}", command),
+                
+                command => unreachable!("Unexpected command: {:?}", command),
             };
+            
+            // Create response data
+            let mut res = serenity::builder::CreateInteractionResponseData::default();
+
+           
+
+            if is_embed(&response_content) {
+                res = res.add_embed(response_content);
+            } else {
+                res = res.content(response_content);
+            }
+            
+
 
             let create_interaction_response = command.create_interaction_response(&ctx.http, |response| {
                 response
