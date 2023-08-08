@@ -1,6 +1,7 @@
 use anyhow::anyhow;
 use serenity::model::application::interaction::{Interaction, InteractionResponseType};
 use serenity::model::application::command::CommandOptionType;
+use serenity::model::prelude::Embed;
 use serenity::{async_trait, model::prelude::GuildId};
 use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
@@ -12,19 +13,10 @@ use std::any::{TypeId, Any};
 mod commands;
 use commands::valorant::*;
 
+
+
 struct Bot; 
 
-#[derive(Debug)]
-enum StringOrEmbed<'a> {
-    String(String),
-    Embed(serenity::builder::CreateEmbed),
-    Str(&'a str)
-}
-
-
-fn is_embed<T: ?Sized + Any>(_s: &T) -> bool {
-    TypeId::of::<serenity::builder::CreateEmbed>() == TypeId::of::<T>()
-}
 
 
 #[async_trait]
@@ -67,44 +59,50 @@ impl EventHandler for Bot {
             
         }).await.unwrap();
 
-        info!("{:?}", commands)
+
     }
 
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
         if let Interaction::ApplicationCommand(command) = interaction {
-            let command_name = StringOrEmbed::String(command.data.name.clone());
-            let response_content = match command_name {
-                StringOrEmbed::Str("profile") => {
-                    let user_id = command.user.id;
-                    let profile = profile(user_id).await;
-                    profile.to_owned();
+
+            // Function for sending embeds
+            match command.data.name.as_str() {
+                "profile" => {
+
+                    let res = profile(command.user.id).await;
+                    match res {
+                        Ok(embed) => {
+                            info!("Embed: {:?}", embed);
+                            let create_interaction_response = command.create_interaction_response(&ctx.http, |response| {
+                                response
+                                    .kind(InteractionResponseType::ChannelMessageWithSource)
+                                    .interaction_response_data(|message| message.embed(|e| {
+                                        e.clone_from(&embed);
+                                        e
+                                    }))
+                            });
+
+                            if let Err(why) = create_interaction_response.await {
+                                eprintln!("Cannot respond to slash command: {}", why)
+                            }
+                        }
+                        Err(err) => {
+                            eprintln!("Error: {}", err);
+                            let _ = command.create_interaction_response(&ctx.http, |response| {
+                                response
+                                    .kind(InteractionResponseType::ChannelMessageWithSource)
+                                    .interaction_response_data(move |message| message.content("Error generating profile"))
+                            });
+
+                        }
+                    }
+                    
                 }
-                
+
                 command => unreachable!("Unexpected command: {:?}", command),
-            };
-            
-            // Create response data
-            let mut res = serenity::builder::CreateInteractionResponseData::default();
-
-           
-
-            if is_embed(&response_content) {
-                res = res.add_embed(response_content);
-            } else {
-                res = res.content(response_content);
             }
             
 
-
-            let create_interaction_response = command.create_interaction_response(&ctx.http, |response| {
-                response
-                    .kind(InteractionResponseType::ChannelMessageWithSource)
-                    .interaction_response_data(|message| message.content(response_content))
-            });
-
-            if let Err(why) = create_interaction_response.await {
-                eprintln!("Cannot respond to slash command: {}", why)
-            }
         }
     }
 }
