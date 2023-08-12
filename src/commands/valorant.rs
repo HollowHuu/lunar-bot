@@ -1,12 +1,15 @@
 use std::env;
 
 // use anyhow::Ok;
-use serenity::model::prelude::UserId;
+use serenity::model::{
+    id::UserId,
+    prelude::User,
+    guild
+};
 use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use serenity::builder::CreateEmbed;
-use shuttle_secrets::{SecretStore, Secrets};
 use tracing::log::info;
 
 #[allow(non_snake_case)]
@@ -20,7 +23,7 @@ struct Profile {
 
 
 pub async fn profile(user_id: UserId) -> Result<CreateEmbed, Box<dyn std::error::Error + Send + Sync>> {
-    let api_string = format!("http://localhost:3000/api/bot/profile");
+    let api_string = format!("https://valorant.aesirdev.tech/api/bot/profile");
     let api_key = env::var("AESIR_API_KEY").unwrap();
     info!("user_id: {}", user_id);
     info!("API Key: {}", api_key);
@@ -45,5 +48,13 @@ pub async fn profile(user_id: UserId) -> Result<CreateEmbed, Box<dyn std::error:
     embed.description(format!("PUUID: {}", &profile.puuid));
 
     Ok(embed)
+
+}
+
+pub async fn update_rank(guild_id: i64) {
+    // Fetch all users from the guild
+    // For each user, get their profile
+    // Update their rank
+    guild::Guild::members()
 
 }

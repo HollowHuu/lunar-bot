@@ -1,14 +1,11 @@
 use anyhow::anyhow;
 use serenity::model::application::interaction::{Interaction, InteractionResponseType};
 use serenity::model::application::command::CommandOptionType;
-use serenity::model::prelude::Embed;
 use serenity::{async_trait, model::prelude::GuildId};
-use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
 use serenity::prelude::*;
 use shuttle_secrets::SecretStore;
-use tracing::{error, info};
-use std::any::{TypeId, Any};
+use tracing::info;
 
 mod commands;
 use commands::valorant::*;
@@ -27,7 +24,7 @@ impl EventHandler for Bot {
 
         let guild_id = GuildId(702085427682869350);
 
-        let commands = GuildId::set_application_commands(&guild_id, &ctx.http, |commands| {
+        let _commands = GuildId::set_application_commands(&guild_id, &ctx.http, |commands| {
             commands.create_application_command(|command| { command.name("hello").description("Say hello") });
             commands.create_application_command(|command| { command.name("profile").description("Get your Valorant profile") });
             commands.create_application_command(|command| { 
