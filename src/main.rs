@@ -1,127 +1,71 @@
-use anyhow::anyhow;
-use serenity::model::application::interaction::{Interaction, InteractionResponseType};
-use serenity::model::application::command::CommandOptionType;
-use serenity::{async_trait, model::prelude::GuildId};
-use serenity::model::gateway::Ready;
-use serenity::prelude::*;
-use shuttle_secrets::SecretStore;
-use tracing::info;
+use serenity::{
+    async_trait,
+    model::{
+        // channel::Message, 
+        gateway::Ready,
+        application::{
+            interaction::{Interaction, InteractionResponseType},
+            // command::CommandOptionType
+        },
+        prelude::GuildId
+    },
+    prelude::*
+};
 
-mod commands;
-use commands::valorant::*;
-
-
-
-struct Bot; 
-
-
+struct Handler;
 
 #[async_trait]
-impl EventHandler for Bot {
-
+impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
-        info!("{} is connected!", ready.user.name);
+        println!("{} is connected!", ready.user.name);
 
         let guild_id = GuildId(702085427682869350);
 
         let _commands = GuildId::set_application_commands(&guild_id, &ctx.http, |commands| {
-            commands.create_application_command(|command| { command.name("hello").description("Say hello") });
-            commands.create_application_command(|command| { command.name("profile").description("Get your Valorant profile") });
-            commands.create_application_command(|command| { 
-                command
-                    .name("getuserbyname")
-                    .description("Get your Valorant user by username")
-                    .create_option(|option| {
-                        option
-                            .name("region")
-                            .description("The region of the user")
-                            .kind(CommandOptionType::String)
-                            .required(true)
-                            .add_string_choice("NA", "na1")
-                            .add_string_choice("EUW", "euw1")
-                            .add_string_choice("EUN", "eun1")
-                            .add_string_choice("KR", "kr")
-                            .add_string_choice("JP", "jp1")
-                            .add_string_choice("BR", "br1")
-                            
-                    })
-                    .create_option(|option| {
-                        option
-                            .name("username")
-                            .description("The username of the user")
-                            .kind(CommandOptionType::String)
-                            .required(true)
-                    })
-            })
-            
+            commands.create_application_command(|command| { command.name("hello").description("Say hello") })
         }).await.unwrap();
-
-
     }
 
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
         if let Interaction::ApplicationCommand(command) = interaction {
-
-            // Function for sending embeds
             match command.data.name.as_str() {
-                "profile" => {
-
-                    let res = profile(command.user.id).await;
-                    match res {
-                        Ok(embed) => {
-                            info!("Embed: {:?}", embed);
-                            let create_interaction_response = command.create_interaction_response(&ctx.http, |response| {
-                                response
-                                    .kind(InteractionResponseType::ChannelMessageWithSource)
-                                    .interaction_response_data(|message| message.embed(|e| {
-                                        e.clone_from(&embed);
-                                        e
-                                    }))
-                            });
-
-                            if let Err(why) = create_interaction_response.await {
-                                eprintln!("Cannot respond to slash command: {}", why)
-                            }
-                        }
-                        Err(err) => {
-                            eprintln!("Error: {}", err);
-                            let _ = command.create_interaction_response(&ctx.http, |response| {
-                                response
-                                    .kind(InteractionResponseType::ChannelMessageWithSource)
-                                    .interaction_response_data(move |message| message.content("Error generating profile"))
-                            });
-
-                        }
-                    }
-                    
+                "hello" => {
+                    let _ = command.create_interaction_response(&ctx.http, |response| {
+                        response.kind(InteractionResponseType::ChannelMessageWithSource)
+                            .interaction_response_data(|message| {
+                                message.content("Hello, world!")
+                            })
+                    }).await;
                 }
-
-                command => unreachable!("Unexpected command: {:?}", command),
+                comamnd => {
+                    let _ = command.create_interaction_response(&ctx.http, |response| {
+                        response.kind(InteractionResponseType::ChannelMessageWithSource)
+                            .interaction_response_data(|message| {
+                                message.content(format!("Unknown command: {}", comamnd))
+                            })
+                    }).await;
+                }
             }
-            
-
         }
     }
 }
 
-#[shuttle_runtime::main]
-async fn serenity(
-    #[shuttle_secrets::Secrets] secret_store: SecretStore,
-) -> shuttle_serenity::ShuttleSerenity {
-    // Get the discord token set in `Secrets.toml`
-    let token = if let Some(token) = secret_store.get("DISCORD_TOKEN") {
-        token
-    } else {
-        return Err(anyhow!("'DISCORD_TOKEN' was not found").into());
-    };
+#[tokio::main]
+async fn main() {
+    let token = "NjkyNjUxNTA4MTEzODY2ODIz.GLfBlz.z-WhFf-NfK-TcyelKSU0el9oDu8odSJNNgAigc";
 
-    // Set gateway intents, which decides what events the bot will be notified about
+    let application_id: u64 = 702085427682869350;
+
     let intents = GatewayIntents::GUILD_MESSAGES | GatewayIntents::MESSAGE_CONTENT;
 
-    let client = Client::builder(&token, intents)
-        .event_handler(Bot)
+    let mut client = Client::builder(&token, intents)
+        .event_handler(Handler)
+        .application_id(application_id)
         .await
         .expect("Err creating client");
 
-    Ok(client.into())
+    if let Err(why) = client.start().await {
+        println!("Client error: {:?}", why);
+    }
+
 }
