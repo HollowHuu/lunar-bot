@@ -12,6 +12,9 @@ use serenity::{
     prelude::*
 };
 
+mod commands;
+use commands::mods::*;
+
 struct Handler;
 
 #[async_trait]
@@ -19,16 +22,19 @@ impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
         println!("{} is connected!", ready.user.name);
 
-        let guild_id = GuildId(702085427682869350);
+        let guild_id = GuildId(1110180774763827261);
 
         let _commands = GuildId::set_application_commands(&guild_id, &ctx.http, |commands| {
-            commands.create_application_command(|command| { command.name("hello").description("Say hello") })
+            commands.create_application_command(|command| { command.name("hello").description("Say hello") });
+            commands.create_application_command(|command| { command.name("nuke").description("Nuke the last 100 messages in the channel") })
         }).await.unwrap();
     }
 
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
         if let Interaction::ApplicationCommand(command) = interaction {
             match command.data.name.as_str() {
+
+                // Hello command
                 "hello" => {
                     let _ = command.create_interaction_response(&ctx.http, |response| {
                         response.kind(InteractionResponseType::ChannelMessageWithSource)
@@ -37,6 +43,21 @@ impl EventHandler for Handler {
                             })
                     }).await;
                 }
+
+                // Nuke Command
+                "nuke" => {
+                    let _ = command.create_interaction_response(&ctx.http, |response| {
+                        response.kind(InteractionResponseType::ChannelMessageWithSource)
+                            .interaction_response_data(|message| {
+                                message.content("Nuking channel...")
+                            })
+                    }).await;
+
+                    let channel_id = command.channel_id;
+                    nuke(channel_id, &ctx).await;
+                }
+
+                // Unknown command
                 comamnd => {
                     let _ = command.create_interaction_response(&ctx.http, |response| {
                         response.kind(InteractionResponseType::ChannelMessageWithSource)
