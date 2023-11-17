@@ -52,10 +52,13 @@ impl EventHandler for Handler {
 
 #[tokio::main]
 async fn main() {
-    let token = "NjkyNjUxNTA4MTEzODY2ODIz.GLfBlz.z-WhFf-NfK-TcyelKSU0el9oDu8odSJNNgAigc";
+    let token = std::env::var("DISCORD_TOKEN").expect("Expected a token in the environment");
 
-    let application_id: u64 = 702085427682869350;
-
+    let application_id: u64 = std::env::var("APPLICATION_ID")
+        .expect("Expected an Application Id in the environment")
+        .parse()
+        .expect("Application Id must be a valid u64");
+    
     let intents = GatewayIntents::GUILD_MESSAGES | GatewayIntents::MESSAGE_CONTENT;
 
     let mut client = Client::builder(&token, intents)
